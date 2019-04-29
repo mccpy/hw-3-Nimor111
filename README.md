@@ -37,10 +37,14 @@ show_conf(L, sigma, 'test graph', 'one_disk.png')
 Download (cut-and-paste) and run Preparation Program 1. Explain in a few words each:
 
 * Which geometrical object does it draw?
+**It draws circles**
 * What is the color of the object, and where is it specified?
-* How does it implement periodic boundary conditions?
+**The color is red, specified in the `fc` parameter of the `pylab.Circle` function**
+* How does it implement periodic boundary conditions? **It places a bound on the x and y coordinates on the plot to be min 0 and max 1 and that's why when a point goes outside these coordinates the periodic boundary condition function is applied to it**
 * What makes that you can see it on the computer screen?
+**The `pylab.show()` function**
 * Does this program create a file? What is this file's name? How would you change it?
+**It creates a file called `one_disk.png`. The name can be changed by modifying the last parameter of the `show_conf` function**
 
 ## A2
 
@@ -76,10 +80,15 @@ f.close()
 Run Preparation Program 2, then run it a second time. Explain in a few words each:
 
 * What does the "if os.path.isfile(filename)" condition test?
+**It tests whether this file exists in the current directory and if it does, whether it's a file**
 * What is the difference between "f = open(filename, 'r')" and "f = open(filename, 'w')"?
+**The first one opens the file in read mode ( a.k.a we can only read data from it ), the second one, in write mode ( a.k.a we can write to it )**
 * What is the meaning of "a, b = line.split()"
+**Splits the line by whitespace and assigns the first number to a and the second to b**
 * What is the meaning of "f.write(str(a[0]) + ' ' + str(a[1]) + '\n')", and in particular of the "\n"?
+**Writes a space-separated tuple of numbers to the file, ending with a newline - as specified by the `\n` symbol**
 * What is this program's potential use?
+**It can be used to generate random configurations of disks ( centers of disks ) in our box space and also keep state of a configuration**
 
 ## B
 
@@ -95,6 +104,36 @@ To construct my_markov_disks.py, start from markov_disks_box.py presented in lec
 * Run this algorithm for four disks
 * Print your program.
 
+```python
+import math
+import random
+
+
+def dist(x, y):
+    d_x = abs(x[0] - y[0]) % 1.0
+    d_x = min(d_x, 1.0 - d_x)
+    d_y = abs(x[1] - y[1]) % 1.0
+    d_y = min(d_y, 1.0 - d_y)
+    return math.sqrt(d_x ** 2 + d_y ** 2)
+
+
+L = [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]
+sigma = 0.15
+sigma_sq = sigma ** 2
+delta = 0.1
+n_steps = 1000
+for steps in range(n_steps):
+    a = random.choice(L)
+    b = [a[0] + random.uniform(-delta, delta), a[1] + random.uniform(-delta, delta)]
+    min_dist = min(dist(b, c) for c in L if c != a)
+    # if the disks do not collide
+    if not (min_dist < 4.0 * sigma_sq):
+        a[:] = b
+        a[0], a[1] = a[0] % 1.0, a[1] % 1.0
+
+print(L)
+```
+
 ## B2
 
 Further modify my_markov_disks.py in two ways:
@@ -104,9 +143,64 @@ Further modify my_markov_disks.py in two ways:
 
 Print this new program (which simulates disks in the periodic box and is able to produce graphics).
 
+```python
+import math
+import random
+
+import pylab
+
+
+def calc_sigma(eta, num_disks):
+    return math.sqrt(eta / (num_disks * math.pi))
+
+
+def show_conf(L, sigma, title, fname):
+    pylab.axes()
+    for [x, y] in L:
+        for ix in range(-1, 2):
+            for iy in range(-1, 2):
+                cir = pylab.Circle((x + ix, y + iy), radius=sigma,  fc='r')
+                pylab.gca().add_patch(cir)
+    pylab.axis('scaled')
+    pylab.title(title)
+    pylab.axis([0.0, 1.0, 0.0, 1.0])
+    pylab.savefig(fname)
+    pylab.show()
+    pylab.close()
+
+
+def dist(x, y):
+    d_x = abs(x[0] - y[0]) % 1.0
+    d_x = min(d_x, 1.0 - d_x)
+    d_y = abs(x[1] - y[1]) % 1.0
+    d_y = min(d_y, 1.0 - d_y)
+    return math.sqrt(d_x ** 2 + d_y ** 2)
+
+
+L = [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]
+eta = 0.4
+sigma = calc_sigma(eta, len(L))
+sigma_sq = sigma ** 2
+delta = 0.1
+n_steps = 1000
+for steps in range(n_steps):
+    a = random.choice(L)
+    b = [a[0] + random.uniform(-delta, delta), a[1] + random.uniform(-delta, delta)]
+    min_dist = min(dist(b, c) for c in L if c != a)
+    if not (min_dist ** 2 < 4.0 * sigma_sq):
+        a[:] = b
+        a[0], a[1] = a[0] % 1.0, a[1] % 1.0
+
+print(L)
+
+show_conf(L, sigma, "my_markov_disks_b2", "my_markov_disks_b2.png")
+```
+
 ## B2 (continued)
 
-Print the plot of one configuration (as a graphics file) produced by my_markov_disks.py. Make sure it invokes periodic boundary conditions (at least one disk should be cut up into several pieces). 
+Print the plot of one configuration (as a graphics file) produced by my_markov_disks.py. Make sure it invokes periodic boundary conditions (at least one disk should be cut up into several pieces).
+
+![markov_disks_b2](my_markov_disks_b2.png)
 
 ## B3
 
@@ -136,23 +230,117 @@ Choose a stepsize (delta) on the order of sigma, for example 0.3 sigma, or 0.5 s
 
 ## B3 (continued)
 * Print your program.
+
+```python
+import os
+import math
+import random
+
+import pylab
+
+
+def setup_configuration(filename, N_sqrt):
+    L = []
+
+    if os.path.isfile(filename):
+        with open(filename, 'r') as f:
+            for line in f:
+                a, b = line.split()
+                L.append([float(a), float(b)])
+        print('starting from file', filename)
+    else:
+        # from the initial_configuration_64.png file
+        two_delxy = 1 / N_sqrt
+        delxy = two_delxy / 2
+        # generate a new configuration
+        L = [[delxy + i * two_delxy, delxy + j * two_delxy] for i in range(N_sqrt) for j in range(N_sqrt)]
+
+        # write it to a file
+        with open(filename, 'w+') as f:
+            for a in L:
+                f.write(str(a[0]) + ' ' + str(a[1]) + '\n')
+
+        print('starting from a new random configuration')
+
+    return L
+
+
+def calc_sigma(eta, num_disks):
+    return math.sqrt(eta / (num_disks * math.pi))
+
+
+def show_conf(L, sigma, title, fname):
+    pylab.axes()
+    for [x, y] in L:
+        for ix in range(-1, 2):
+            for iy in range(-1, 2):
+                cir = pylab.Circle((x + ix, y + iy), radius=sigma,  fc='r')
+                pylab.gca().add_patch(cir)
+    pylab.axis('scaled')
+    pylab.title(title)
+    pylab.axis([0.0, 1.0, 0.0, 1.0])
+    pylab.savefig(fname)
+    pylab.show()
+    pylab.close()
+
+
+def dist(x, y):
+    d_x = abs(x[0] - y[0]) % 1.0
+    d_x = min(d_x, 1.0 - d_x)
+    d_y = abs(x[1] - y[1]) % 1.0
+    d_y = min(d_y, 1.0 - d_y)
+    return math.sqrt(d_x ** 2 + d_y ** 2)
+
+
+eta = 0.72
+N = 64
+sigma = calc_sigma(eta, N)
+sigma_sq = sigma ** 2
+
+filename = 'disk_configuration_N{0}_eta{1}.txt'.format(N, eta)
+
+L = setup_configuration(filename, math.sqrt(N))
+delta = 0.5 * sigma
+n_steps = 1000
+for steps in range(n_steps):
+    a = random.choice(L)
+    b = [a[0] + random.uniform(-delta, delta), a[1] + random.uniform(-delta, delta)]
+    min_dist = min(dist(b, c) for c in L if c != a)
+    if not (min_dist ** 2 < 4.0 * sigma_sq):
+        a[:] = b
+        a[0], a[1] = a[0] % 1.0, a[1] % 1.0
+
+print(L)
+
+show_conf(L, sigma, "my_markov_disks_b3", "my_markov_disks_b3.png")
+```
+
 * Print the initial configuration (as a graphics file) for N = 256 at density eta= 0.72. (Note that you can do this easily by setting n_steps = 0).
+
+![my_markov_disks_b3](my_markov_disks_b3.png)
 
 ## B4
 
-Run my_markov_disks.py for N = 64, n_steps = 10000, at eta = 0.42 from the square lattice initial condition, then repeatedly using as initial configuration the final configuration of the previous run. 
+Run my_markov_disks.py for N = 64, n_steps = 10000, at eta = 0.42 from the square lattice initial condition, then repeatedly using as initial configuration the final configuration of the previous run.
 
 * Print the initial configuration (as a graphics file) of the sequence of runs (set n_steps = 0 to plot it)
+![initial_b4](initial_b4.png)
 * Print the final configuration (as a graphics file) of the entire sequence of run.
+![final_b4](final_b4.png)
 * Explain what you see (describe the final configuration and how the simulation got there).
+**The simulation seems very random and chaotic. It got there after 10 runs with using the configuration of a previous step as an initial for the next one**
 
 ## B5
 
 Run my_markov_disks.py for N = 64, n_steps = 10000, at eta = 0.72 from the square lattice initial condition, then at least ten times using as initial configuration the final configuration of the previous run.
 
 * Print at least one intermediate configuration (as graphics files) of the entire run (To upload several intermediate configurations, you may join the graphics files into one big file).
+
+![b5_1.png](b5/b5_1.png)![b5_2.png](b5/b5_2.png)![b5_3.png](b5/b5_3.png)
 * Print the final configuration of the entire sequence of runs.
+![b5_10.png](b5/b5_10.png)
 * Explain what you see (give some physical explanation of what the configurations look like).
+**With every run reusing the configuration leads to a more chaotic result. This is best seen when comparing the first and the second intermediate configuration from above.**
 
 
 ## C
@@ -191,7 +379,7 @@ Psi_6=1/N \sum_i psi_6(i)
 
 It can be shown numerically that the average of |Psi_6| is finite for very large systems of hard disks at density eta > 0.72.
 
-Incorporate the calculation of Psi_6 into my_markov_disks.py using the following code snippet. Note that you need the cmath library to perform complex arithmetic. Note also that 6j = (0.0, 6.0), in complex notation. The delx_dely function computes the distance vector, corrected for periodic boundary conditions. 
+Incorporate the calculation of Psi_6 into my_markov_disks.py using the following code snippet. Note that you need the cmath library to perform complex arithmetic. Note also that 6j = (0.0, 6.0), in complex notation. The delx_dely function computes the distance vector, corrected for periodic boundary conditions.
 
 ```python
 def delx_dely(x, y):
